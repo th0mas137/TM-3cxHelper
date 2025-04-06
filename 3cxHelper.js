@@ -2,7 +2,7 @@
 // @name         3CX Helper - Tools
 // @namespace    http://tampermonkey.net/
 // @version      3.3
-// @description  Bulk Copy/ Import Holiday , User Password, Export , ETC!
+// @description  Bulk Copy/ Import Holiday , User Password, Export
 // @match        *://*.3cx.be/*
 // @match        *://*.3cx.com/*
 // @match        *://*.3cx.eu/*
