@@ -169,7 +169,7 @@
         userDataDiv.style.marginTop = '15px';
         userDataDiv.innerHTML = `
             <div style="padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
-                <h6 style="margin-bottom: 15px; color: #495057; font-weight: bold;">🔐 User Authentication Info</h6>
+                <h6 style="margin-bottom: 15px; color: #495057; font-weight: bold;">Phone Auth</h6>
                 
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 250px;">
