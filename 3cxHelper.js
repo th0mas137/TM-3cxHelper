@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         3CX Helper - Tools
 // @namespace    http://tampermonkey.net/
-// @version      3.3
-// @description  Bulk Copy/ Import Holiday , User Password, Export
+// @version      3.4
+// @description  Bulk Copy/ Import Holiday , User Password, Export.
 // @match        *://*.3cx.be/*
 // @match        *://*.3cx.com/*
 // @match        *://*.3cx.eu/*
@@ -29,6 +29,46 @@
         };
     })();
 
+    // ==================== CAPTURE USER DATA ====================
+    let capturedUserData = null;
+    
+    (function() {
+        const originalXHROpen = XMLHttpRequest.prototype.open;
+        const originalXHRSend = XMLHttpRequest.prototype.send;
+        
+        XMLHttpRequest.prototype.open = function(method, url) {
+            const urlString = typeof url === 'string' ? url : '';
+            this._isUserDataRequest = method === 'GET' && urlString.includes('/xapi/v1/Users(');
+            return originalXHROpen.apply(this, arguments);
+        };
+        
+        XMLHttpRequest.prototype.send = function(body) {
+            if (this._isUserDataRequest) {
+                const originalOnReadyStateChange = this.onreadystatechange;
+                this.onreadystatechange = function() {
+                    if (this.readyState === 4 && this.status === 200) {
+                        try {
+                            const userData = JSON.parse(this.responseText);
+                            if (userData.AuthID || userData.AuthPassword) {
+                                capturedUserData = {
+                                    AuthID: userData.AuthID || 'N/A',
+                                    AuthPassword: userData.AuthPassword || 'N/A'
+                                };
+                                setTimeout(() => {
+                                    injectUserDataFields();
+                                }, 1000);
+                            }
+                        } catch (e) {}
+                    }
+                    if (originalOnReadyStateChange) {
+                        originalOnReadyStateChange.apply(this, arguments);
+                    }
+                };
+            }
+            return originalXHRSend.apply(this, arguments);
+        };
+    })();
+
     /**
      * Returns the active bearer token captured from outgoing API calls.
      * @returns {string|null} The bearer token (without the "Bearer " prefix), or null if not yet captured.
@@ -48,6 +88,11 @@
     function maybeInjectPasswordField() {
         if (window.location.hash.startsWith('#/office/users/edit/')) {
             injectPasswordField();
+        }
+    }
+    function maybeInjectUserDataFields() {
+        if (window.location.hash.startsWith('#/office/users/edit/')) {
+            injectUserDataFields();
         }
     }
     function maybeInjectExportButtonUI() {
@@ -105,7 +150,73 @@
             formLabel.parentNode.parentNode.appendChild(passwordDiv);
         }
     }
-    const passwordObserver = new MutationObserver(() => maybeInjectPasswordField());
+    
+    // ==================== USER DATA FIELDS FUNCTIONALITY ====================
+    function injectUserDataFields() {
+        if (!capturedUserData) return;
+        if (document.getElementById('user-auth-id-field')) return;
+        
+        const accessPasswordField = document.getElementById('custom-password-field');
+        let injectionPoint = accessPasswordField ? accessPasswordField.parentNode : 
+            document.querySelector('label[for^="did-select"]')?.parentNode?.parentNode;
+        
+        if (!injectionPoint) {
+            setTimeout(() => { injectUserDataFields(); }, 2000);
+            return;
+        }
+        
+        const userDataDiv = document.createElement('div');
+        userDataDiv.style.marginTop = '15px';
+        userDataDiv.innerHTML = `
+            <div style="padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <h6 style="margin-bottom: 15px; color: #495057; font-weight: bold;">🔐 User Authentication Info</h6>
+                
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <div class="d-flex align-items-center form-label">
+                            <label for="user-auth-id-field" style="font-weight: 500;">Auth ID</label>
+                        </div>
+                        <input type="text" id="user-auth-id-field" class="form-control" style="width:100%; background: #fff;" value="${capturedUserData.AuthID}" readonly>
+                    </div>
+                    
+                    <div style="flex: 1; min-width: 250px;">
+                        <div class="d-flex align-items-center form-label">
+                            <label for="user-auth-password-field" style="font-weight: 500;">Auth Password</label>
+                        </div>
+                        <div style="position: relative;">
+                            <input type="password" id="user-auth-password-field" class="form-control" style="width:100%; background: #fff; padding-right: 40px;" value="${capturedUserData.AuthPassword}" readonly>
+                            <button type="button" id="toggle-auth-password" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; padding: 4px 6px; border-radius: 3px; color: #6c757d; font-size: 14px; font-family: monospace; font-weight: bold;" title="Toggle password visibility">👁</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        injectionPoint.insertAdjacentElement('afterend', userDataDiv);
+        
+        // Add event listener for password toggle (avoiding CSP violation)
+        const toggleButton = document.getElementById('toggle-auth-password');
+        const passwordField = document.getElementById('user-auth-password-field');
+        
+        if (toggleButton && passwordField) {
+            toggleButton.addEventListener('click', function() {
+                if (passwordField.type === 'password') {
+                    passwordField.type = 'text';
+                    toggleButton.textContent = '🔒';
+                    toggleButton.title = 'Hide password';
+                } else {
+                    passwordField.type = 'password';
+                    toggleButton.textContent = '👁';
+                    toggleButton.title = 'Show password';
+                }
+            });
+        }
+    }
+    
+    const passwordObserver = new MutationObserver(() => {
+        maybeInjectPasswordField();
+        maybeInjectUserDataFields();
+    });
     passwordObserver.observe(document.body, { childList: true, subtree: true });
 
     // ==================== MODIFYING REQUEST FOR PASSWORD ====================
@@ -827,12 +938,18 @@
 
     // ==================== INITIALIZATION ====================
     maybeInjectPasswordField();
+    maybeInjectUserDataFields();
     maybeInjectExportButtonUI();
     maybeInjectImportHolidaysButtonUI();
 
     window.addEventListener('hashchange', () => {
         maybeInjectPasswordField();
+        maybeInjectUserDataFields();
         maybeInjectExportButtonUI();
         maybeInjectImportHolidaysButtonUI();
+        // Clear captured data when navigating away from user edit
+        if (!window.location.hash.startsWith('#/office/users/edit/')) {
+            capturedUserData = null;
+        }
     });
 })();
