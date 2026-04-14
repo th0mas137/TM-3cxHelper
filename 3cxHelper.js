@@ -8,6 +8,7 @@
 // @match        *://*.3cx.eu/*
 // @match        *://*.my3cx.be/*
 // @match        *://*.my3cx.eu/*
+// @match        *://pbx764317.fluxcloud.eu/*
 // @updateURL   https://raw.githubusercontent.com/th0mas137/TM-3cxHelper/refs/heads/main/3cxHelper.js
 // @downloadURL https://raw.githubusercontent.com/th0mas137/TM-3cxHelper/refs/heads/main/3cxHelper.js
 // @grant        GM_notification
@@ -31,17 +32,17 @@
 
     // ==================== CAPTURE USER DATA ====================
     let capturedUserData = null;
-    
+
     (function() {
         const originalXHROpen = XMLHttpRequest.prototype.open;
         const originalXHRSend = XMLHttpRequest.prototype.send;
-        
+
         XMLHttpRequest.prototype.open = function(method, url) {
             const urlString = typeof url === 'string' ? url : '';
             this._isUserDataRequest = method === 'GET' && urlString.includes('/xapi/v1/Users(');
             return originalXHROpen.apply(this, arguments);
         };
-        
+
         XMLHttpRequest.prototype.send = function(body) {
             if (this._isUserDataRequest) {
                 const originalOnReadyStateChange = this.onreadystatechange;
@@ -150,27 +151,27 @@
             formLabel.parentNode.parentNode.appendChild(passwordDiv);
         }
     }
-    
+
     // ==================== USER DATA FIELDS FUNCTIONALITY ====================
     function injectUserDataFields() {
         if (!capturedUserData) return;
         if (document.getElementById('user-auth-id-field')) return;
-        
+
         const accessPasswordField = document.getElementById('custom-password-field');
-        let injectionPoint = accessPasswordField ? accessPasswordField.parentNode : 
+        let injectionPoint = accessPasswordField ? accessPasswordField.parentNode :
             document.querySelector('label[for^="did-select"]')?.parentNode?.parentNode;
-        
+
         if (!injectionPoint) {
             setTimeout(() => { injectUserDataFields(); }, 2000);
             return;
         }
-        
+
         const userDataDiv = document.createElement('div');
         userDataDiv.style.marginTop = '15px';
         userDataDiv.innerHTML = `
             <div style="padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
                 <h6 style="margin-bottom: 15px; color: #495057; font-weight: bold;">Phone Auth</h6>
-                
+
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 250px;">
                         <div class="d-flex align-items-center form-label">
@@ -178,7 +179,7 @@
                         </div>
                         <input type="text" id="user-auth-id-field" class="form-control" style="width:100%; background: #fff;" value="${capturedUserData.AuthID}" readonly>
                     </div>
-                    
+
                     <div style="flex: 1; min-width: 250px;">
                         <div class="d-flex align-items-center form-label">
                             <label for="user-auth-password-field" style="font-weight: 500;">Auth Password</label>
@@ -191,13 +192,13 @@
                 </div>
             </div>
         `;
-        
+
         injectionPoint.insertAdjacentElement('afterend', userDataDiv);
-        
+
         // Add event listener for password toggle (avoiding CSP violation)
         const toggleButton = document.getElementById('toggle-auth-password');
         const passwordField = document.getElementById('user-auth-password-field');
-        
+
         if (toggleButton && passwordField) {
             toggleButton.addEventListener('click', function() {
                 if (passwordField.type === 'password') {
@@ -212,7 +213,7 @@
             });
         }
     }
-    
+
     const passwordObserver = new MutationObserver(() => {
         maybeInjectPasswordField();
         maybeInjectUserDataFields();
@@ -309,7 +310,9 @@
     let lastExportData = null;
     function injectExportButtonUI() {
         if (document.getElementById('export-queues-btn')) return;
-        const container = document.querySelector('.d-flex.flex-wrap.gap-2.flex-grow-1.mw-0');
+        const container =
+              document.querySelector('.d-flex.flex-wrap.gap-2.flex-grow-1.mw-0') ||
+              document.querySelector('div[top-bar] div[left-section]');
         if (container) {
             const btnWrapper = document.createElement('app-button-add');
             btnWrapper.setAttribute('data-qa', 'exportQueue');
